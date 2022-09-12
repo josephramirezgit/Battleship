@@ -1,0 +1,231 @@
+Joseph Ramirez
+CS32 SP22
+Project 3 report.txt
+
+1. A description of the design of your data structures. For example, how do you represent the board? How do you record shots made?
+
+The board class has a few data members that are used in order to store the relevant data. The board itself is represented by a character array that is 10x10 characters long at most. This board will have the relevant characters to denote whether or not a ship has been hit, if a spot is unoccupied, if a spot was missed, etc. Doing this will allow shots to be recorded by changing whatever character is there to an 'X' character. The 2D array data structure will therefore be able to hold this. The member functions of the BoardImpl class handle actually changing these values. The ships placed on the board are represented in the board class with an STL linked list of ships (which is a private struct inside the BoardImpl class). This private class holds relevant ship data such as a ship's ID, symbol, health and starting point. Having the ships organized this way allows for easy access to all of the ship's data members that may be useful to the user.
+
+The game class follows a similar pattern to the board class for storing data. The ships are held in a linked list that holds ship structs. Each ship struct will hold the relevant data for the ship, including the ship symbol, ID, length, and health (which starts off as the length of the ship). Data is updated whenever a ship is added. Additionally, the rows and columns are private members in the GameImpl class in order to successfully initialize the constructor which should just hold the number of rows and columns in the board. 
+
+The MediocrePlayer class has a couple of private members that hold relevant data. First off, the state is tracked in order to know which method of attack should be used. A vector is now used to store all of the points that have ever been hit. This allows for the prevention of hitting the same point more than once because the class will know what has already been hit and find a new point if needed. Saving the state of whether or not a previous attack hit and if a previous attack destroyed a ship were just kept as single bools. This is because you really only need to keep track of the most recent hit, so larger data structures such as vectors or stacks would likely be excessive space-wise. Another vector is used to store all the spots that can be hit when in state 2. This allows the class to just pick points randomly from what is allowed.
+
+Finally, the GoodPlayer class has many data structures that keep track of what can be attacked. Firstly, like with MediocrePlayer, all the spots that have ever been hit are kept in a vector so the class can prevent hitting the same spot more than once. When in attack mode (state 2), 4 queues are made in order to store attacks that can be made going upwards, downwards, rightwards, and leftwards. A vector that holds all these queues is needed in order to save which direction should be attacked. All of the spots that can ever be hit when in attack mode (state 2) are therefore kept in this vector of queues, but accessing which spots can be attacked is usually better done by just accessing the queue that holds the direction that should be attacked. Additionally, a vector is used to hold available attack options since I only wanted to attack every other point (to avoid redundancy). 
+
+2. A prose description of your GoodPlayer's strategies for placing ships and recommending moves. If they're easy to describe, this may well be only a paragraph or two. This is a high-level summary; details go in the pseudocode.
+
+GoodPlayer places ships in the same exact way if only standard ships are added. They are placed in a configuration such that a mediocre player accessing state 2 would not be able to hit any other ships other than the one currently being attacked because of how spaced out the ships are. Otherwise, the GoodPlayer will place the ships in the same random configuration as the MediocrePlayer. GoodPlayer will first store every other point on the board in a vector. In non-attack mode (state 1), the player randomly picks points from this vector so as to avoid redundancy. If every other point gets exhausted, which will be very rare, then it will start randomly picking points.
+
+Now, if a shot is made, then GoodPlayer will enter state 2. Queues are made to hold near attack points in all direction. The direction of the ship is attempted to be found. The direction is helpful because it prevents aimlessly attacking clockwise. Finding the direction is especially useful because the GoodPlayer will just keep attacking in that direction, usually destroying a ship. If this fails, then either the attacks will go back to state 1 or GoodPlayer will continue attacking clockwise. Queues are FIFO, so the first shots to be made will be nearest to the point originally hit.
+
+3. Pseudocode for non-trivial algorithms. For example, how does a MediocrePlayer place ships? How does your GoodPlayer implement its strategies?
+
+BOARD CLASS (Board.cpp)
+void BoardImpl::block()
+Repeat floor RC/2 times
+	Randomly pick point
+	Block if possible
+	Otherwise, retry 
+
+bool BoardImpl::placeShip(Point topOrLeft, int shipId, Direction dir)
+If the ship ID is valid
+	If the direction is horizontal and you can fit the ship
+		Ensure ship is not already placed
+			Place if you can
+			Return true
+	If you can't put it down, return false
+	If the direction is vertical and you can fit the ship
+		Ensure ship is not already placed
+			Place if you can
+			Return true
+	If you can't put it down, return false
+
+bool BoardImpl::unplaceShip(Point topOrLeft, int shipId, Direction dir)
+If bad ID, return false
+Depending on direction 
+	If out of bounds or reach another symbol
+		return false
+	Replace the board with empty spaces
+Go through ship list
+	Get rid of one unplaced
+Return true
+
+void BoardImpl::display(bool shotsOnly) const
+Print the row and column indexes
+If only want to see shots
+	Only show unoccupied, hit or miss
+Otherwise 
+	Show board regularly
+
+bool BoardImpl::attack(Point p, bool& shotHit, bool& shipDestroyed, int& shipId)
+If out of bounds or already hit
+	return false
+If hit boat
+	Find out what boat you hit
+		Decrease that boat's health
+		If the health is now 0 then you destroyed the boat
+		Return true
+If hit water
+	Denote missed shot
+	Return true
+Return true
+
+GAME CLASS (Game.cpp)
+bool GameImpl::addShip(int length, char symbol, string name)
+Temp store all data for new ship
+Push new ship onto the vector
+
+int GameImpl::shipLength(int shipId) const
+char GameImpl::shipSymbol(int shipId) const
+string GameImpl::shipName(int shipId) const
+For three functions above,
+	Go through entire ship list
+		If found relevant data member,
+			return data member
+
+Player* GameImpl::play(Player* p1, Player* p2, Board& b1, Board& b2, bool shouldPause)
+Check if human player(s)
+If cannot place ships
+	return null
+While ships are still alive
+	Announce turn 
+	Attack other player
+	record attack result
+	Announce result of hit
+	Repeat process for other player
+If either board got all ships destroyed
+	Other board player won
+Announce winner
+
+PLAYER CLASS (Player.cpp)
+
+HumanPlayer
+bool HumanPlayer::placeShips(Board& b)
+For all the ships we know,
+        ask for the direction
+        Ask for the point
+        place the boats
+For all ships
+	Ask for direction
+	Ask for point
+	Place boat
+// in all of these, ensure input is allowable
+
+MediocrePlayer
+bool MediocrePlayer::placeShips(Board& b)
+50 times
+	Block board
+	Attempt to place the ships down using putShipsDown (see pseudocode right below)
+	If worked, unblock board
+	return true
+If never worked
+	return false
+
+bool putShipsDown(Board& b, int shipId, int numShips, int rows, int cols) // recursively puts ships down
+For all spaces
+	try to place vertically
+		if can also place all other ships
+			return true
+		If cannot, unlace ship
+	try to place horizontally
+		if can also place all other ships 
+			return true
+		If cannot, unlace ship
+Return false
+
+Point MediocrePlayer::recommendAttack()
+Determine state
+If in state 1
+	pick point randomly
+		make sure point not already hit
+			if so, repeat
+	if point unique, return it
+If in state 2
+	Find point last hit
+	If spots on cross already empty
+		Go 4 spots up if possible
+			Add point to spots on cross
+		Go 4 spots down if possible
+			Add point to spots on cross
+		Go 4 spots right if possible 
+			Add point to spots on cross
+		Go 4 spots left if possible 
+			Add point to spots on cross
+	Ensure all no spots already were hit
+	Randomly pick a point from spots on cross
+
+void MediocrePlayer::recordAttackResult(Point p, bool validShot, bool shotHit, bool shipDestroyed, int shipId)
+If not valid shot
+	update members
+If was valid shot
+	update members 
+	also note if destroyed ship
+
+GoodPlayer
+Point GoodPlayer::returnPointFromState1() // purpose of this function is to consolidate state 1 behavior (like Mediocre player) into one function
+Store every other point 
+Until every other point picked
+	Randomly pick available points
+If every other point exhausted
+	Randomly pick points 
+
+bool GoodPlayer::placeShips(Board& b)
+If all standard ships
+	// put large ships manually on corners
+	// put small ship in center
+	Try to add length 5 ship
+	Try to add length 4 ship
+	Try to add length 2 ship
+	Try to add length 3 ship from start
+	Try to add length 3 ship from end
+	If all worked
+		return true
+If above failed
+	Place randomly
+		return true
+If not standard ships
+	place randomly 
+		return true
+
+Point GoodPlayer::recommendAttack()
+Check conditions for state 1
+	If in state 1 and missed 
+		stay in state 1
+	If already exhausted direction
+		stay in state 1
+	If in state 2 but no more points to hit
+		stay in state 1
+Check conditions for state 2
+	If switching from state 1 to 2
+		Empty all queues 
+		Redirect direction of attack
+	If all the queues are empty
+		Update queues in all direction with hittable shots 
+	Switch state to 2
+If in state 1
+	return point from state 1 // see code 2 functions above
+If in state 2
+	If direction unknown but last shot made
+	or if new to state 2 and hit made
+		Switch direction to "maybe" state
+		Go around clockwise trying to make shots
+	If new to state 2 but did not hit 
+		Direction is not found
+	If new to not new to state 2, did not hit, and already flipped direction
+		Direction was not found
+	If hit was unsuccessful
+		continue clockwise
+	If hit missed but direction was "maybe"
+		flip the orientation of attack
+	Depending on direction
+		If queue of points is not empty for direction
+			Return point from queue
+		If all directions used
+			return to state 1
+
+void GoodPlayer::recordAttackResult(Point p, bool validShot, bool shotHit, bool shipDestroyed, int shipId)
+If not valid shot
+	Update members accordingly 
+If shot is valid 
+	Update if ship destroyed 
+	Update members accordingly 
