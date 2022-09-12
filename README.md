@@ -1,6 +1,8 @@
 # Battleship!
 A computerized version of the board game Battleship! 
+
 More details on CS32_Project3_Spec.pdf
+
 Completed in Spring 2022
 
 Introduction
